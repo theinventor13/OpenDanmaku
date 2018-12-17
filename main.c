@@ -22,13 +22,18 @@ typedef struct{
 	bool down;
 }keys;
 
-struct thing{
+struct projectile{
 	vec2 pos;
 	vec2 acc;
-	struct thing * next;	
+	struct projectile * next;	
 };
+typedef struct projectile bullet;
+bullet * bullethandle = NULL;
 
-typedef struct thing bullet;
+typedef struct{
+	vec2 pos;
+	vec2 acc;
+}entity;
 
 size_t screenwidth = 800;
 size_t screenheight = 600;
@@ -49,7 +54,7 @@ void error(const char * errormessage){
 
 void setdt(void){
 	static size_t oldtime;
-	dt = ((double)SDL_GetTicks() - (double)oldtime) / 1000;
+	dt = ((double)SDL_GetTicks() - (double)oldtime) / 1000.0;
 	oldtime = SDL_GetTicks();
 }
 
@@ -74,6 +79,38 @@ void updatetimers(void){
 			}
 			temp = temp->next;
 		}while(temp != timerhandle);
+	}
+}
+
+void addbullet(double x, double y, double sx, double sy){
+	bullet * temp = bullethandle;
+	bullethandle = (bullet *)malloc(sizeof(bullet));
+	bullethandle->pos.x = x;
+	bullethandle->pos.y = y;
+	bullethandle->acc.x = sx;
+	bullethandle->acc.y = sy;
+	bullethandle->next = temp;
+}
+
+void deletebullet(bullet * remove){
+	bullet * temp = remove->next;
+	remove->pos = remove->next->pos;
+	remove->acc = remove->next->acc;
+	remove->next = remove->next->next;
+	free(temp);
+}
+
+void updatebullets(void){
+	if(bullethandle == NULL){
+		return;
+	}else{
+		bullet * temp = bullethandle;
+		do{
+			temp->pos.x += temp->acc.x * dt;
+			temp->pos.y += temp->acc.y * dt;
+			rect((int)temp->pos.x, (int)temp->pos.y, 10, 10);
+			temp = temp->next;
+		}while(temp != NULL);
 	}
 }
 
@@ -109,30 +146,45 @@ void rect(int x, int y, int w, int h){
 }
 
 void loop(void){
-	clear();
-	static double xacc;
-	static double yacc;
+	
+	static double acc;
+	static entity pr;
+	static timer bullettimer;
+	
 	if(init){
-		xacc = (double)screenwidth / 3.0;
-		yacc = (double)screenheight / 3.0;
+		pr.pos.x = (double)screenwidth / 2;
+		pr.pos.y = (double)screenheight / 2;
+		pr.acc.x = (double)screenwidth / 3.0;
+		pr.acc.y = pr.acc.x;
+		bullettimer.timeleft = .1;
+		addtimer(&bullettimer);
+		init = false;
 	}
+	
+	clear();
 	
 	setcolor(255, 0, 0);
+	updatebullets();
 	
 	if(move.left){
-		px -= xacc * dt;
+		pr.pos.x -= pr.acc.x * dt;
 	}
 	if(move.right){
-		px += xacc * dt;
+		pr.pos.x += pr.acc.x * dt;
 	}
 	if(move.up){
-		py -= yacc * dt;
+		pr.pos.y -= pr.acc.y * dt;
 	}
 	if(move.down){
-		py += yacc * dt;
+		pr.pos.y += pr.acc.y * dt;
 	}
 	
-	rect(px, py, screenwidth/40, screenheight/20);
+	if(checktimer(bullettimer)){
+		addbullet(pr.pos.x, pr.pos.y, .0, -500.0);
+		bullettimer.timeleft = .1;
+	}
+	rect(pr.pos.x, pr.pos.y, screenwidth/40, screenheight/20);
+	
 	flip();
 }
 
@@ -206,7 +258,6 @@ int main(int argc, char ** argv){
 		setdt();
 		updatetimers();
 		loop();
-		init = false;
 	}
 	return 0;
 }
